@@ -14,6 +14,8 @@ app.use(cors());
 
 app.use("/api/users", userRoutes);
 app.use("/api/profiles", profileRoutes);
+app.use('/uploads', express.static('public/uploads'));
+
 
 app.get("/", (req, res) => {
   res.send("API is running...");

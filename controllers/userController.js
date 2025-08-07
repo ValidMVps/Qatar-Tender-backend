@@ -11,9 +11,25 @@ import {
 // @route   POST /api/users/register
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
-  const { email, password, userType, phone, ...profileData } = req.body;
+  const { email, password, userType, phone, ...rest } = req.body;
 
-  // Validation (keep your existing validation)
+  // Validation based on user type
+  if (userType === "individual") {
+    if (!rest.fullName) {
+      res.status(400);
+      throw new Error("Please provide full name");
+    }
+  } else if (userType === "business") {
+    if (!rest.companyName) {
+      res.status(400);
+      throw new Error("Please provide company name");
+    }
+  }
+
+  if (!email || !password || !phone) {
+    res.status(400);
+    throw new Error("Please provide all required fields");
+  }
 
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -24,12 +40,21 @@ const registerUser = asyncHandler(async (req, res) => {
   // Generate verification token
   const verificationToken = generateVerificationToken();
   const verificationTokenExpires = new Date();
-  verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24); // 24 hours expiration
+  verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24);
 
-  console.log("Generated verification token:", verificationToken); // ADDED
-  console.log("Token expires at:", verificationTokenExpires); // ADDED
+  // Log the token to console
+  console.log("====================================");
+  console.log("NEW USER REGISTRATION");
+  console.log("Email:", email);
+  console.log("Verification Token:", verificationToken);
+  console.log(
+    "Verification URL:",
+    `${process.env.BASE_URL}/api/users/verify-email/${verificationToken}`
+  );
+  console.log("Token Expires:", verificationTokenExpires);
+  console.log("====================================");
 
-  // Create user with verification fields
+  // Create user
   const user = await User.create({
     email,
     password,
@@ -39,25 +64,28 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    // Create profile (keep your existing profile creation)
-    const profile = await Profile.create({
+    // Create profile with minimal data
+    const profileData = {
       user: user._id,
       userType,
       phone,
-      ...profileData,
-    });
+    };
+
+    if (userType === "individual") {
+      profileData.fullName = rest.fullName;
+    } else if (userType === "business") {
+      profileData.companyName = rest.companyName;
+      profileData.companyEmail = email;
+    }
+
+    await Profile.create(profileData);
 
     // Send verification email
-    console.log("Attempting to send verification email to:", email); // ADDED
     try {
       await sendVerificationEmail(user.email, user.verificationToken);
-      console.log("Verification email sent successfully"); // ADDED
-      console.log(
-        "Full verification URL:",
-        `${process.env.BASE_URL}/api/users/verify-email/${verificationToken}`
-      ); // ADDED
+      console.log(`Verification email sent to ${user.email}`);
     } catch (error) {
-      console.error("Failed to send verification email:", error); // ADDED
+      console.error("Failed to send verification email:", error);
     }
 
     res.status(201).json({
@@ -65,7 +93,6 @@ const registerUser = asyncHandler(async (req, res) => {
       email: user.email,
       userType: user.userType,
       isVerified: user.isVerified,
-      verificationToken: verificationToken, // ADDED - for debugging in response
       message:
         "Registration successful. Please check your email for verification.",
     });
@@ -106,9 +133,6 @@ const resendVerificationEmail = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Auth user & get token
-// @route   POST /api/users/login
-// @access  Public
 // @desc    Auth user & get token
 // @route   POST /api/users/login
 // @access  Public

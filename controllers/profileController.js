@@ -1,62 +1,146 @@
 import asyncHandler from "express-async-handler";
 import Profile from "../models/Profile.js";
+import User from "../models/User.js";
 
 // @desc    Create or update user profile
 // @route   POST /api/profiles
 // @access  Private
 const createProfile = asyncHandler(async (req, res) => {
   const { userType } = req.user;
+  const profile = await Profile.findOne({ user: req.user._id });
+
+  if (profile) {
+    res.status(400);
+    throw new Error("Profile already exists. Use update instead.");
+  }
 
   let profileData = {
     user: req.user._id,
-    phone: req.body.phone,
     userType,
+    ...req.body,
   };
 
-  if (userType === "individual") {
-    profileData.fullName = req.body.fullName;
-    profileData.nationalId = req.body.nationalId || undefined;
-  } else if (userType === "business") {
-    profileData.companyName = req.body.companyName;
-    profileData.commercialRegistrationNumber =
-      req.body.commercialRegistrationNumber || undefined;
-  }
-
-  const profile = await Profile.findOneAndUpdate(
-    { user: req.user._id },
-    profileData,
-    { new: true, upsert: true }
-  );
-
-  res.status(201).json(profile);
+  const newProfile = await Profile.create(profileData);
+  res.status(201).json(newProfile);
 });
 
 // @desc    Update profile
 // @route   PUT /api/profiles
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
   const profile = await Profile.findOne({ user: req.user._id });
 
-  if (profile) {
-    profile.phone = req.body.phone || profile.phone;
-
-    if (profile.userType === "individual") {
-      profile.fullName = req.body.fullName || profile.fullName;
-      profile.nationalId = req.body.nationalId || profile.nationalId;
-    } else if (profile.userType === "business") {
-      profile.companyName = req.body.companyName || profile.companyName;
-      profile.commercialRegistrationNumber =
-        req.body.commercialRegistrationNumber ||
-        profile.commercialRegistrationNumber;
-    }
-
-    const updatedProfile = await profile.save();
-    res.json(updatedProfile);
-  } else {
+  if (!profile) {
     res.status(404);
     throw new Error("Profile not found");
   }
+
+  // Common fields
+  if (req.body.phone) {
+    profile.phone = req.body.phone;
+  }
+  if (req.body.address) {
+    profile.address = req.body.address;
+  }
+
+  if (profile.userType === "individual") {
+    // Individual fields
+    if (req.body.fullName) {
+      profile.fullName = req.body.fullName;
+    }
+    if (req.body.personalEmail) {
+      // Validate email format
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.body.personalEmail)) {
+        res.status(400);
+        throw new Error("Invalid email format");
+      }
+      profile.personalEmail = req.body.personalEmail;
+      user.email = req.body.personalEmail; // Update main user email
+    }
+    if (req.body.nationalId) {
+      profile.nationalId = req.body.nationalId;
+    }
+
+    // Handle document uploads with validation
+    if (req.body.nationalIdFront) {
+      if (!isValidImageUrl(req.body.nationalIdFront)) {
+        res.status(400);
+        throw new Error("Invalid national ID front image URL");
+      }
+      profile.nationalIdFront = req.body.nationalIdFront;
+    }
+    if (req.body.nationalIdBack) {
+      if (!isValidImageUrl(req.body.nationalIdBack)) {
+        res.status(400);
+        throw new Error("Invalid national ID back image URL");
+      }
+      profile.nationalIdBack = req.body.nationalIdBack;
+    }
+  } else if (profile.userType === "business") {
+    // Business fields
+    if (req.body.contactPersonName) {
+      profile.contactPersonName = req.body.contactPersonName;
+    }
+    if (req.body.companyEmail) {
+      // Validate email format
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.body.companyEmail)) {
+        res.status(400);
+        throw new Error("Invalid email format");
+      }
+      profile.companyEmail = req.body.companyEmail;
+      user.email = req.body.companyEmail; // Update main user email
+    }
+
+    // Handle commercial registration document (can only be set once)
+    if (req.body.commercialRegistrationDoc) {
+      if (profile.commercialRegistrationDoc) {
+        res.status(400);
+        throw new Error(
+          "Commercial registration document cannot be modified once uploaded"
+        );
+      }
+      if (!isValidImageUrl(req.body.commercialRegistrationDoc)) {
+        res.status(400);
+        throw new Error("Invalid commercial registration document URL");
+      }
+      profile.commercialRegistrationDoc = req.body.commercialRegistrationDoc;
+    }
+
+    // Allow setting registration number only if not already set
+    if (
+      req.body.commercialRegistrationNumber &&
+      !profile.commercialRegistrationNumber
+    ) {
+      profile.commercialRegistrationNumber =
+        req.body.commercialRegistrationNumber;
+    }
+  }
+
+  // Save both user and profile
+  await Promise.all([user.save(), profile.save()]);
+
+  // Return updated profile (excluding sensitive fields)
+  const response = profile.toObject();
+  delete response.__v;
+  delete response.createdAt;
+
+  res.json({
+    ...response,
+    message: "Profile updated successfully",
+  });
 });
+
+// Helper function to validate image URLs
+function isValidImageUrl(url) {
+  try {
+    new URL(url); // Validates URL structure
+    // Check for common image extensions
+    return /\.(jpe?g|png|webp|bmp|gif|svg)$/i.test(url.split("?")[0]);
+  } catch {
+    return false;
+  }
+}
 
 // @desc    Get user profile
 // @route   GET /api/profiles
