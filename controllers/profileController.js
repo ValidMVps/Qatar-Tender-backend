@@ -142,6 +142,105 @@ function isValidImageUrl(url) {
   }
 }
 
+// @desc    Submit documents for verification
+// @route   PUT /api/profiles/submit-documents
+// @access  Private
+const submitDocuments = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  const profile = await Profile.findOne({ user: req.user._id });
+
+  if (!profile) {
+    res.status(404);
+    throw new Error("Profile not found");
+  }
+
+  // Check if documents are already verified
+  if (user.isDocumentVerified === "verified") {
+    res.status(400);
+    throw new Error("Documents are already verified");
+  }
+
+  // Check if documents are pending verification
+  if (user.isDocumentVerified === "pending") {
+    res.status(400);
+    throw new Error("Documents are already submitted for verification");
+  }
+
+  // Validate documents based on user type
+  if (user.userType === "individual") {
+    if (
+      !req.body.nationalId ||
+      !req.body.nationalIdFront ||
+      !req.body.nationalIdBack
+    ) {
+      res.status(400);
+      throw new Error(
+        "Please provide national ID and front/back images for verification"
+      );
+    }
+
+    // Validate image URLs
+    if (
+      !isValidImageUrl(req.body.nationalIdFront) ||
+      !isValidImageUrl(req.body.nationalIdBack)
+    ) {
+      res.status(400);
+      throw new Error("Invalid document image URL(s)");
+    }
+
+    profile.nationalId = req.body.nationalId;
+    profile.nationalIdFront = req.body.nationalIdFront;
+    profile.nationalIdBack = req.body.nationalIdBack;
+  } else if (user.userType === "business") {
+    if (
+      !req.body.commercialRegistrationNumber ||
+      !req.body.commercialRegistrationDoc
+    ) {
+      res.status(400);
+      throw new Error(
+        "Please provide commercial registration number and document for verification"
+      );
+    }
+
+    // Validate document URL
+    if (!isValidImageUrl(req.body.commercialRegistrationDoc)) {
+      res.status(400);
+      throw new Error("Invalid commercial registration document URL");
+    }
+
+    profile.commercialRegistrationNumber =
+      req.body.commercialRegistrationNumber;
+    profile.commercialRegistrationDoc = req.body.commercialRegistrationDoc;
+  } else {
+    res.status(400);
+    throw new Error("Invalid user type for document submission");
+  }
+
+  // Update document verification status
+  user.isDocumentVerified = "pending";
+  user.documentRejectionReason = undefined;
+
+  await Promise.all([profile.save(), user.save()]);
+
+  res.json({
+    message: "Documents submitted for verification",
+    isDocumentVerified: user.isDocumentVerified,
+  });
+});
+
+// @desc    Get document verification status
+// @route   GET /api/profiles/verification-status
+// @access  Private
+const getVerificationStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select(
+    "isDocumentVerified documentRejectionReason"
+  );
+
+  res.json({
+    isDocumentVerified: user.isDocumentVerified,
+    documentRejectionReason: user.documentRejectionReason,
+  });
+});
 // @desc    Get user profile
 // @route   GET /api/profiles
 // @access  Private
@@ -156,4 +255,10 @@ const getProfile = asyncHandler(async (req, res) => {
   }
 });
 
-export { createProfile, updateProfile, getProfile };
+export {
+  createProfile,
+  updateProfile,
+  getProfile,
+  submitDocuments,
+  getVerificationStatus,
+};

@@ -136,13 +136,15 @@ const resendVerificationEmail = asyncHandler(async (req, res) => {
 // @desc    Auth user & get token
 // @route   POST /api/users/login
 // @access  Public
+// controllers/userController.js
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });
 
   if (user && (await user.matchPassword(password))) {
-    if (!user.isVerified) {
+    // Skip email verification check for admin users
+    if (user.userType !== "admin" && !user.isVerified) {
       res.status(401);
       throw new Error("Please verify your email before logging in");
     }
@@ -151,7 +153,9 @@ const loginUser = asyncHandler(async (req, res) => {
       _id: user._id,
       email: user.email,
       userType: user.userType,
+      adminType: user.adminType,
       isVerified: user.isVerified,
+      isDocumentVerified: user.isDocumentVerified,
       token: generateToken(user._id),
     });
   } else {

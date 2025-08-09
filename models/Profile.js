@@ -1,3 +1,4 @@
+// models/Profile.js
 import mongoose from "mongoose";
 
 const profileSchema = new mongoose.Schema(
@@ -19,9 +20,19 @@ const profileSchema = new mongoose.Schema(
     userType: {
       type: String,
       required: true,
-      enum: ["individual", "business"],
+      enum: ["individual", "business", "admin"],
     },
-    
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+    },
+
     // Individual-specific fields
     fullName: {
       type: String,
@@ -38,7 +49,7 @@ const profileSchema = new mongoose.Schema(
     personalEmail: {
       type: String,
     },
-    
+
     // Business-specific fields
     companyName: {
       type: String,
@@ -54,6 +65,14 @@ const profileSchema = new mongoose.Schema(
     },
     commercialRegistrationDoc: {
       type: String, // URL to the document
+    },
+
+    // Admin-specific fields (for profile completeness)
+    adminName: {
+      type: String,
+    },
+    adminPosition: {
+      type: String,
     },
   },
   { timestamps: true }

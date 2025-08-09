@@ -1,3 +1,4 @@
+// models/User.js
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
@@ -17,18 +18,35 @@ const userSchema = new mongoose.Schema(
     userType: {
       type: String,
       required: true,
-      enum: ["individual", "business"],
+      enum: ["individual", "business", "admin"],
       default: "individual",
+    },
+    adminType: {
+      type: String,
+      enum: ["super", "normal", null],
+      default: null,
     },
     isVerified: {
       type: Boolean,
       default: false,
+    },
+    isDocumentVerified: {
+      type: String,
+      enum: ["pending", "verified", "rejected"],
+      default: "pending",
     },
     verificationToken: {
       type: String,
     },
     verificationTokenExpires: {
       type: Date,
+    },
+    documentRejectionReason: {
+      type: String,
+    },
+    permissions: {
+      type: [String],
+      default: [],
     },
   },
   { timestamps: true }
