@@ -28,8 +28,8 @@ const verificationEmailTemplate = (verificationLink) => `
 
 export const sendVerificationEmail = async (email, verificationToken) => {
   const verificationLink = `${process.env.BASE_URL}/api/users/verify-email/${verificationToken}`;
-  
-  console.log('Constructed verification link:', verificationLink); // ADDED
+
+  console.log("Constructed verification link:", verificationLink); // ADDED
 
   const mailOptions = {
     from: `"Qatar Tender" <${process.env.EMAIL_USERNAME}>`,
@@ -40,11 +40,37 @@ export const sendVerificationEmail = async (email, verificationToken) => {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId); // ADDED
-    console.log('Preview URL:', nodemailer.getTestMessageUrl(info)); // Only works with ethereal.email
+    console.log("Email sent:", info.messageId); // ADDED
+    console.log("Preview URL:", nodemailer.getTestMessageUrl(info)); // Only works with ethereal.email
   } catch (error) {
-    console.error('Detailed email sending error:', error); // ADDED
+    console.error("Detailed email sending error:", error); // ADDED
     throw new Error("Failed to send verification email");
+  }
+};
+
+const passwordResetEmailTemplate = (resetLink) => `
+  <h2>Password Reset Request</h2>
+  <p>You requested to reset your password. Click the link below to proceed:</p>
+  <a href="${resetLink}">${resetLink}</a>
+  <p>If you didn't request this, please ignore this email.</p>
+  <p>This link will expire in 1 hour.</p>
+`;
+
+export const sendPasswordResetEmail = async (email, resetToken) => {
+  const resetLink = `${process.env.BASE_URL}/api/users/reset-password/${resetToken}`;
+
+  const mailOptions = {
+    from: `"Qatar Tender" <${process.env.EMAIL_USERNAME}>`,
+    to: email,
+    subject: "Password Reset - Qatar Tender",
+    html: passwordResetEmailTemplate(resetLink),
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Password reset email error:", error);
+    throw new Error("Failed to send password reset email");
   }
 };
 

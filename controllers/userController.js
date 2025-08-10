@@ -5,7 +5,9 @@ import generateToken from "../utils/generateToken.js";
 import {
   generateVerificationToken,
   sendVerificationEmail,
+  sendPasswordResetEmail,
 } from "../utils/emailSender.js";
+
 
 // @desc    Register a new user
 // @route   POST /api/users/register
@@ -220,10 +222,96 @@ const verifyEmail = asyncHandler(async (req, res) => {
   });
 });
 
+
+// @desc    Request password reset
+// @route   POST /api/users/forgot-password
+// @access  Public
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Generate reset token (6-digit code for simplicity)
+  const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
+  const resetTokenExpires = new Date();
+  resetTokenExpires.setHours(resetTokenExpires.getHours() + 1); // 1 hour expiration
+
+  user.passwordResetToken = resetToken;
+  user.passwordResetTokenExpires = resetTokenExpires;
+  await user.save();
+
+  try {
+    await sendPasswordResetEmail(user.email, resetToken);
+    res.json({ message: "Password reset code sent to email" });
+  } catch (error) {
+    console.error("Failed to send password reset email:", error);
+    res.status(500);
+    throw new Error("Failed to send password reset email");
+  }
+});
+
+// @desc    Verify reset code
+// @route   POST /api/users/verify-reset-code
+// @access  Public
+const verifyResetCode = asyncHandler(async (req, res) => {
+  const { email, code } = req.body;
+
+  const user = await User.findOne({ 
+    email,
+    passwordResetToken: code,
+    passwordResetTokenExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    res.status(400);
+    throw new Error("Invalid or expired reset code");
+  }
+
+  res.json({ 
+    message: "Reset code verified",
+    email: user.email,
+    resetToken: user.passwordResetToken 
+  });
+});
+
+// @desc    Reset password
+// @route   PUT /api/users/reset-password
+// @access  Public
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, code, newPassword } = req.body;
+
+  const user = await User.findOne({ 
+    email,
+    passwordResetToken: code,
+    passwordResetTokenExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    res.status(400);
+    throw new Error("Invalid or expired reset code");
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetTokenExpires = undefined;
+  await user.save();
+
+  res.json({ message: "Password reset successful" });
+});
+
+
 export {
   registerUser,
   loginUser,
   getUserProfile,
   resendVerificationEmail,
   verifyEmail,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword
 };
