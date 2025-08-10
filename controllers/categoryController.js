@@ -1,11 +1,15 @@
 // controllers/categoryController.js
 import asyncHandler from "express-async-handler";
 import Category from "../models/Category.js";
+import Tender from "../models/Tender.js";
 
 // @desc    Create a new category
 // @route   POST /api/categories
 // @access  Private/Admin
 const createCategory = asyncHandler(async (req, res) => {
+  console.log("createCategory - req.user:", req.user); // Debug log
+  console.log("createCategory - req.body:", req.body); // Debug log
+
   // Check if user is admin
   if (req.user.userType !== "admin") {
     res.status(403);
@@ -102,7 +106,7 @@ const deleteCategory = asyncHandler(async (req, res) => {
     throw new Error("Cannot delete category as it is used in tenders");
   }
 
-  await category.remove();
+  await category.deleteOne(); // Updated from category.remove()
   res.json({ message: "Category removed" });
 });
 

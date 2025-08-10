@@ -3,6 +3,8 @@ import asyncHandler from "express-async-handler";
 import Bid from "../models/Bid.js";
 import Tender from "../models/Tender.js";
 import User from "../models/User.js";
+import Payment from "../models/Payment.js";
+import { v4 as uuidv4 } from "uuid";
 
 // @desc    Create a new bid
 // @route   POST /api/bids
@@ -63,12 +65,13 @@ const createBid = asyncHandler(async (req, res) => {
     amount,
     description,
     paymentStatus: "pending",
-    paymentAmount: process.env.BID_PAYMENT_FEE || 100, // Default fee if not set
+    paymentAmount: process.env.BID_PAYMENT_FEE || 100,
   });
 
   // Generate payment reference
   const payment = await Payment.create({
     user: req.user._id,
+    tender: tender,
     bid: bid._id,
     amount: bid.paymentAmount,
     paymentMethod: "pending",

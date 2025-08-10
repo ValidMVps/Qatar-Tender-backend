@@ -9,67 +9,63 @@ import { v4 as uuidv4 } from "uuid";
 // @route   POST /api/tenders
 // @access  Private
 const createTender = asyncHandler(async (req, res) => {
-    const {
-      title,
-      description,
-      category,
-      location,
-      contactEmail,
-      image,
-      estimatedBudget,
-      deadline,
-    } = req.body;
-  
-    // Validation
-    if (
-      !title ||
-      !description ||
-      !category ||
-      !location ||
-      !contactEmail ||
-      !estimatedBudget ||
-      !deadline
-    ) {
-      res.status(400);
-      throw new Error("Please fill all required fields");
-    }
-  
-    // Check if category exists
-    const categoryExists = await Category.findById(category);
-    if (!categoryExists || !categoryExists.isActive) {
-      res.status(400);
-      throw new Error("Invalid category");
-    }
-  
-    // Validate deadline is in the future
-    const deadlineDate = new Date(deadline);
-    if (deadlineDate <= new Date()) {
-      res.status(400);
-      throw new Error("Deadline must be in the future");
-    }
-  
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(contactEmail)) {
-      res.status(400);
-      throw new Error("Please provide a valid contact email");
-    }
-  
-    // Create tender
-    const tender = await Tender.create({
-      title,
-      description,
-      category,
-      location,
-      contactEmail,
-      image,
-      estimatedBudget,
-      deadline: deadlineDate,
-      postedBy: req.user._id,
-    });
-  
-    res.status(201).json(tender);
+  const {
+    title,
+    description,
+    category,
+    location,
+    contactEmail,
+    image,
+    estimatedBudget,
+    deadline,
+  } = req.body;
+
+  if (
+    !title ||
+    !description ||
+    !category ||
+    !location ||
+    !contactEmail ||
+    !estimatedBudget ||
+    !deadline
+  ) {
+    res.status(400);
+    throw new Error("Please fill all required fields");
+  }
+
+  const categoryExists = await Category.findById(category);
+  if (!categoryExists || !categoryExists.isActive) {
+    res.status(400);
+    throw new Error("Invalid category");
+  }
+
+  const deadlineDate = new Date(deadline);
+  if (deadlineDate <= new Date()) {
+    res.status(400);
+    throw new Error("Deadline must be in the future");
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(contactEmail)) {
+    res.status(400);
+    throw new Error("Please provide a valid contact email");
+  }
+
+  // Create tender
+  const tender = await Tender.create({
+    title,
+    description,
+    category,
+    location,
+    contactEmail,
+    image,
+    estimatedBudget,
+    deadline: deadlineDate,
+    postedBy: req.user._id,
   });
+
+  res.status(201).json(tender);
+});
 
 // @desc    Get all tenders
 // @route   GET /api/tenders
@@ -133,10 +129,21 @@ const updateTender = asyncHandler(async (req, res) => {
   }
 
   // Only allow certain fields to be updated
-  const { title, description, contactEmail, image, deadline } = req.body;
+  const {
+    title,
+    description,
+    location,
+    contactEmail,
+    image,
+    estimatedBudget,
+    deadline,
+  } = req.body;
 
   if (title) tender.title = title;
   if (description) tender.description = description;
+
+  if (location) tender.location = location;
+
   if (contactEmail) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(contactEmail)) {
@@ -145,7 +152,17 @@ const updateTender = asyncHandler(async (req, res) => {
     }
     tender.contactEmail = contactEmail;
   }
+
   if (image) tender.image = image;
+
+  if (estimatedBudget) {
+    if (isNaN(estimatedBudget) || estimatedBudget <= 0) {
+      res.status(400);
+      throw new Error("Estimated budget must be a positive number");
+    }
+    tender.estimatedBudget = estimatedBudget;
+  }
+
   if (deadline) {
     const deadlineDate = new Date(deadline);
     if (deadlineDate <= new Date()) {

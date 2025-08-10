@@ -37,13 +37,10 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error("User already exists");
   }
 
-  // Generate verification token
   const verificationToken = generateVerificationToken();
   const verificationTokenExpires = new Date();
   verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24);
 
-  // Log the token to console
-  console.log("====================================");
   console.log("NEW USER REGISTRATION");
   console.log("Email:", email);
   console.log("Verification Token:", verificationToken);
@@ -52,9 +49,7 @@ const registerUser = asyncHandler(async (req, res) => {
     `${process.env.BASE_URL}/api/users/verify-email/${verificationToken}`
   );
   console.log("Token Expires:", verificationTokenExpires);
-  console.log("====================================");
 
-  // Create user
   const user = await User.create({
     email,
     password,
@@ -64,7 +59,6 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    // Create profile with minimal data
     const profileData = {
       user: user._id,
       userType,
@@ -80,7 +74,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
     await Profile.create(profileData);
 
-    // Send verification email
     try {
       await sendVerificationEmail(user.email, user.verificationToken);
       console.log(`Verification email sent to ${user.email}`);
@@ -117,7 +110,6 @@ const resendVerificationEmail = asyncHandler(async (req, res) => {
     throw new Error("Email is already verified");
   }
 
-  // Generate new token
   const verificationToken = generateVerificationToken();
   const verificationTokenExpires = new Date();
   verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24);
@@ -140,28 +132,49 @@ const resendVerificationEmail = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
+  // Find user with exact email match (case sensitive)
   const user = await User.findOne({ email });
 
-  if (user && (await user.matchPassword(password))) {
-    // Skip email verification check for admin users
-    if (user.userType !== "admin" && !user.isVerified) {
-      res.status(401);
-      throw new Error("Please verify your email before logging in");
-    }
-
-    res.json({
-      _id: user._id,
-      email: user.email,
-      userType: user.userType,
-      adminType: user.adminType,
-      isVerified: user.isVerified,
-      isDocumentVerified: user.isDocumentVerified,
-      token: generateToken(user._id),
-    });
-  } else {
+  if (!user) {
     res.status(401);
     throw new Error("Invalid email or password");
   }
+
+  // Check password
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error("Invalid email or password");
+  }
+
+  // Check verification status (skip for admins)
+  if (user.userType !== "admin" && !user.isVerified) {
+    res.status(401);
+    throw new Error("Please verify your email first");
+  }
+
+  // Prepare response
+  const response = {
+    _id: user._id,
+    email: user.email,
+    userType: user.userType,
+    isVerified: user.isVerified,
+    token: generateToken(user._id),
+  };
+
+  // Add admin-specific fields if user is admin
+  if (user.userType === "admin") {
+    response.adminType = user.adminType;
+    response.permissions = user.permissions;
+
+    // Also populate profile if needed
+    const profile = await Profile.findOne({ user: user._id });
+    if (profile) {
+      response.profile = profile;
+    }
+  }
+
+  res.json(response);
 });
 
 // @desc    Get user profile
@@ -191,7 +204,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
   if (!user) {
     res.status(400);
-    throw new Error("Invalid or expired verification token");
+    throw new Error("Invalid or expire token");
   }
 
   user.isVerified = true;

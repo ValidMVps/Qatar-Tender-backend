@@ -322,20 +322,29 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
 const adminLogin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email, userType: "admin" });
+  const user = await User.findOne({
+    email,
+    userType: "admin",
+  });
 
-  if (user && (await user.matchPassword(password))) {
-    res.json({
-      _id: user._id,
-      email: user.email,
-      adminType: user.adminType,
-      permissions: user.permissions,
-      token: generateToken(user._id),
-    });
-  } else {
+  if (!user) {
     res.status(401);
     throw new Error("Invalid email or password");
   }
+
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error("Invalid email or password");
+  }
+
+  res.json({
+    _id: user._id,
+    email: user.email,
+    adminType: user.adminType,
+    permissions: user.permissions,
+    token: generateToken(user._id),
+  });
 });
 
 const adminLogout = asyncHandler(async (req, res) => {

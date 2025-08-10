@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import User from "../models/User.js";
 import Profile from "../models/Profile.js";
-import bcrypt from "bcryptjs";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -21,7 +20,7 @@ const seedSuperAdmin = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-
+    
     const email = process.env.SUPER_ADMIN_EMAIL || "superadmin@example.com";
     const password = process.env.SUPER_ADMIN_PASSWORD || "superadmin123";
 
@@ -35,14 +34,11 @@ const seedSuperAdmin = async () => {
       process.exit(0);
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create super admin user
+    // Create super admin user - DON'T manually hash password
+    // Let the User model's pre-save middleware handle the hashing
     const user = await User.create({
       email,
-      password: hashedPassword,
+      password, // Pass plain text password - it will be hashed by the model
       userType: "admin",
       adminType: "super",
       isVerified: true,
