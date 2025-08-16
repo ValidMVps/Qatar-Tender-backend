@@ -10,6 +10,11 @@ import { v4 as uuidv4 } from "uuid";
 // @route   POST /api/bids
 // @access  Private (business users only)
 const createBid = asyncHandler(async (req, res) => {
+  if (req.user.isDocumentVerified !== "verified") {
+    res.status(403);
+    throw new Error("Your account must be verified to place bids");
+  }
+  
   const { tender, amount, description } = req.body;
 
   // Validation

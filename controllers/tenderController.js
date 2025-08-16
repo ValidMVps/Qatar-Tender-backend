@@ -9,6 +9,11 @@ import { v4 as uuidv4 } from "uuid";
 // @route   POST /api/tenders
 // @access  Private
 const createTender = asyncHandler(async (req, res) => {
+  if (req.user.isDocumentVerified !== "verified") {
+    res.status(403);
+    throw new Error("Your account must be verified to post tenders");
+  }
+
   const {
     title,
     description,

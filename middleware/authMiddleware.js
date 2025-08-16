@@ -13,18 +13,18 @@ const protect = asyncHandler(async (req, res, next) => {
     try {
       token = req.headers.authorization.split(" ")[1];
       console.log("Token received:", token); // Debug log
-      
+
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       console.log("Decoded token:", decoded); // Debug log
-      
+
       req.user = await User.findById(decoded.id).select("-password");
       console.log("User found:", req.user); // Debug log
-      
+
       if (!req.user) {
         res.status(401);
         throw new Error("User not found");
       }
-      
+
       next();
     } catch (error) {
       console.error("Token verification error:", error); // Debug log
@@ -39,7 +39,7 @@ const protect = asyncHandler(async (req, res, next) => {
 
 const admin = (req, res, next) => {
   console.log("Admin middleware - req.user:", req.user); // Debug log
-  
+
   if (
     req.user &&
     req.user.userType === "admin" &&
@@ -53,13 +53,15 @@ const admin = (req, res, next) => {
 };
 
 // Middleware to check document verification
-const verified = (req, res, next) => {
+const verified = asyncHandler(async (req, res, next) => {
   if (req.user && req.user.isDocumentVerified === "verified") {
     next();
   } else {
-    res.status(401);
-    throw new Error("Account documents not verified");
+    res.status(403);
+    throw new Error(
+      "Account documents not verified. Please submit and wait for verification."
+    );
   }
-};
+});
 
 export { protect, admin, verified };
